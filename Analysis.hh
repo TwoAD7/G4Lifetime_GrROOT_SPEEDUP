@@ -39,7 +39,9 @@ public:
 
   static Analysis* getInstance();
 
+  //Constructor (takes pointers to the following objects)
   Analysis(DetectorConstruction*,Incoming_Beam*,Outgoing_Beam*);
+  //destructor
   ~Analysis();
 
   // ! Recorder

@@ -1,5 +1,9 @@
 #include "Analysis.hh"
+//#include<omp.h>
 
+//The implementation file for 'Analysis.hh'
+
+//Constructor implementation 
 Analysis::Analysis(DetectorConstruction* DE, Incoming_Beam* BI, Outgoing_Beam* BO):detector(DE),BeamIn(BI),BeamOut(BO)
 {
 #ifdef DEBUG
@@ -56,7 +60,7 @@ Analysis::Analysis(DetectorConstruction* DE, Incoming_Beam* BI, Outgoing_Beam* B
 
 }
 
-
+//Destructor implementation
 Analysis::~Analysis()
 {
 #ifdef DEBUG
@@ -333,9 +337,8 @@ void Analysis::Init()
   Target_Pos = detector->GetTargetPlacement()->GetTranslation();
   if(detector->GetPlungerType() > 0){
 	 Degrader_Pos = detector->GetDegraderPlacement()->GetTranslation();
-	 if(detector->GetPlungerType() == 2){
+	 if(detector->GetPlungerType() == 2)
 		Stopper_Pos = detector->GetStopperPlacement()->GetTranslation();
-	 }
   }
   
   //TM added in v4.2 for static parameters, input histograms in root file
@@ -387,11 +390,10 @@ void Analysis::Treat(const G4Event *Event)
   if(detector->IsDefinedGretina()) {
 	 G4int GretinaCollectionID=SDman->GetCollectionID("GretinaTracker");
 	 TreatGretina((GretinaHitDetectorCollection*)(HCE->GetHC(GretinaCollectionID)));
-	 if(!CASCADE_ANALYSIS_FLAG){
+	 if(!CASCADE_ANALYSIS_FLAG)
 	   AddbackMode3Simple();
-	 }else{
+	 else
 	   AddbackMode3Simple((GretinaHitDetectorCollection*)HCE->GetHC(GretinaCollectionID));// This is a similar approximation as the mode 1 described above. The primary difference is that this does not create a connected region but just adds up all points within some distance
-	 }
   }
 
 }
@@ -452,66 +454,64 @@ void Analysis::TreatIons(TrackerIonHitsCollection* ionCollection)
   tlog=false;dlog=false;slog=false;
 		
   for(G4int i=1;i<NIons;i++)
-	 {
-		if((*ionCollection)[i]->GetFlag()==TARGET_FACE_FLAG)
-		  {tlog=true;
-			 deposits.TarLen=-(*ionCollection)[i-1]->GetLength()/mm;}
+	{
+		if((*ionCollection)[i]->GetFlag()==TARGET_FACE_FLAG){
+			tlog=true;
+			deposits.TarLen=-(*ionCollection)[i-1]->GetLength()/mm;
+		}
 		if((*ionCollection)[i-1]->GetFlag()==TARGET_BACK_FLAG)
 		  tlog=false;
-		if(tlog)
-		  {
+		if(tlog){
 			 deposits.TarDep+=(*ionCollection)[i-1]->GetEdep()/MeV;
 			 deposits.TarLen+=(*ionCollection)[i-1]->GetLength()/mm;
-		  }
+		}
 			 
-		if((*ionCollection)[i]->GetFlag()==DEGRADER_FACE_FLAG)
-		  {dlog=true;
-			 deposits.DegLen=-(*ionCollection)[i-1]->GetLength()/mm;}
+		if((*ionCollection)[i]->GetFlag()==DEGRADER_FACE_FLAG){
+			dlog=true;
+			deposits.DegLen=-(*ionCollection)[i-1]->GetLength()/mm;
+		}
 		if((*ionCollection)[i-1]->GetFlag()==DEGRADER_BACK_FLAG)
 		  dlog=false;
-		if(dlog)
-		  {
-			 deposits.DegDep+=(*ionCollection)[i-1]->GetEdep()/MeV;
-			 deposits.DegLen+=(*ionCollection)[i-1]->GetLength()/mm;
-		  }
+		if(dlog){
+			deposits.DegDep+=(*ionCollection)[i-1]->GetEdep()/MeV;
+			deposits.DegLen+=(*ionCollection)[i-1]->GetLength()/mm;
+		}
 			 
-		if((*ionCollection)[i]->GetFlag()==STOPPER_FACE_FLAG)
-		  {slog=true;
-			 deposits.StoLen=-(*ionCollection)[i-1]->GetLength()/mm;}
+		if((*ionCollection)[i]->GetFlag()==STOPPER_FACE_FLAG){
+			slog=true;
+			deposits.StoLen=-(*ionCollection)[i-1]->GetLength()/mm;
+		}
 		if((*ionCollection)[i-1]->GetFlag()==STOPPER_BACK_FLAG)
 		  slog=false;
-		if(slog)
-		  {
+		if(slog){
 			 deposits.StoDep+=(*ionCollection)[i-1]->GetEdep()/MeV;
 			 deposits.StoLen+=(*ionCollection)[i-1]->GetLength()/mm;
-		  }
+		}
 		if((*ionCollection)[i]->GetFlag()==REACTION_FLAG)
-		  {
+		{
 			 u.setTheta((*ionCollection)[i]->GetTheta());
 			 u.setPhi((*ionCollection)[i]->GetPhi());
 			 v.setTheta((*ionCollection)[i+1]->GetTheta());
 			 v.setPhi((*ionCollection)[i+1]->GetPhi());
-		  }
-	 }
+		}
+	}
 		
   //	setTargetEdepAverage(deposits.TarDep);
 		
   deposits.ReactionFlag=BeamOut->GetReactionFlag();
   deposits.ReactionDTheta=acos(u.dot(v));
-  if(ion_ev[REACTION_FLAG].beta>0)
-	 {
+  if(ion_ev[REACTION_FLAG].beta>0){
 		au=u.cross(ez);au.setMag(1.);
 		av=u.cross(v);av.setMag(1.);
 		if(au.dot(av)>=0) // to be ckeced
 		  deposits.ReactionDPhi=acos(au.dot(av));
 		else
 		  deposits.ReactionDPhi=twopi-acos(au.dot(av));
-	 }
+	}
   else deposits.ReactionDPhi=0.;
   
 
-  
-
+ 	
   if(S800Accept(ion_ev[RECO_FLAG])){
     d_ta = (ion_ev[RECO_FLAG].KE/BeamOut->GetURsetKE()-1.)*100.;
     y_ta = ion_ev[RECO_FLAG].y;
@@ -535,12 +535,12 @@ void Analysis::TreatSeGA(TrackerGammaHitsCollection* gammaCollection)
   G4int NbHits=gammaCollection->entries();
 	 
   if(S800Accept(ion_ev[RECO_FLAG])){
-	 if(NbHits>0) {
-		if(NbHits > MaxTrack && SeGA_TRACK_FLAG == TRUE){
-		  G4cerr << "\n Event # " << fEvtNum << "  with too many tracks (" << NbHits << ") -- Skipping Event" <<G4endl;
-		  MissCtr++;
-		  return;
-		}
+  	if(NbHits>0) {
+			if(NbHits > MaxTrack && SeGA_TRACK_FLAG == TRUE){
+			  G4cerr << "\n Event # " << fEvtNum << "  with too many tracks (" << NbHits << ") -- Skipping Event" <<G4endl;
+			  MissCtr++;
+			  return;
+			}
 		
 		G4int r,d,s,q;
 		G4int HitPattern[MaxRing][MaxDet];
@@ -559,27 +559,27 @@ void Analysis::TreatSeGA(TrackerGammaHitsCollection* gammaCollection)
 		
 		  // Keep track of the individual interractions of gamma
 		  if(SeGA_TRACK_FLAG == TRUE){
-			 if(strcmp((*gammaCollection)[i]->GetParticleID(),"gamma") == 0 
+		  	if(strcmp((*gammaCollection)[i]->GetParticleID(),"gamma") == 0 
 				 || strcmp((*gammaCollection)[i]->GetParticleID(),"e-") == 0 ){
-				track_D[track_N]=d+1;
-				track_R[track_N]=r;
-				track_S[track_N]=s;
-				track_Q[track_N]=q;
-				track_x[track_N]=(*gammaCollection)[i]->GetPos().getX()/mm;
-				track_y[track_N]=(*gammaCollection)[i]->GetPos().getY()/mm;
-				track_z[track_N]=(*gammaCollection)[i]->GetPos().getZ()/mm;
-				track_E[track_N]=(*gammaCollection)[i]->GetEdep()/keV;
-				track_N++;
-			 }
-			 else {
+					track_D[track_N]=d+1;
+					track_R[track_N]=r;
+					track_S[track_N]=s;
+					track_Q[track_N]=q;
+					track_x[track_N]=(*gammaCollection)[i]->GetPos().getX()/mm;
+					track_y[track_N]=(*gammaCollection)[i]->GetPos().getY()/mm;
+					track_z[track_N]=(*gammaCollection)[i]->GetPos().getZ()/mm;
+					track_E[track_N]=(*gammaCollection)[i]->GetEdep()/keV;
+					track_N++;
+			  }
+			  else {
 #ifdef DEBUG
-				G4cout <<  " \n ========> " <<  G4endl; 
-				G4cout <<  " \t Particle :" << (*gammaCollection)[i]->GetParticleID() <<  G4endl; 
-				G4cout <<  " \t Energy   : " <<(*gammaCollection)[i]->GetEdep()/keV << "keV" <<  G4endl; 
-				G4cout <<  " \t Pos X: " << (*gammaCollection)[i]->GetPos().getX()/mm  << " Y: " << (*gammaCollection)[i]->GetPos().getY()/mm  << " Z: " << (*gammaCollection)[i]->GetPos().getZ()/mm   <<  G4endl; 
-				G4cout <<  " \t Ring : " << r  << " Detector: " <<  d <<  G4endl;
+					G4cout <<  " \n ========> " <<  G4endl; 
+					G4cout <<  " \t Particle :" << (*gammaCollection)[i]->GetParticleID() <<  G4endl; 
+					G4cout <<  " \t Energy   : " <<(*gammaCollection)[i]->GetEdep()/keV << "keV" <<  G4endl; 
+					G4cout <<  " \t Pos X: " << (*gammaCollection)[i]->GetPos().getX()/mm  << " Y: " << (*gammaCollection)[i]->GetPos().getY()/mm  << " Z: " << (*gammaCollection)[i]->GetPos().getZ()/mm   <<  G4endl; 
+					G4cout <<  " \t Ring : " << r  << " Detector: " <<  d <<  G4endl;
 #endif		 	
-			 }
+			  }
 		  }
 		  // /!\ Counting Ring [1:2] Detectors [0,7]
 		  if(strcmp((*gammaCollection)[i]->GetParticleID(),"gamma") == 0  || 
@@ -849,7 +849,8 @@ void Analysis::TreatGretina( GretinaHitDetectorCollection* GretinaCollection)
 	      trackG_z[trackG_N]=(*GretinaCollection)[i]->GetPos().getZ()/mm;
 	      trackG_E[trackG_N]=(*GretinaCollection)[i]->GetEdep()/keV;
 	      trackG_N++;
-	    }else {
+	    }
+	    else {
 #ifdef DEBUG
 	      G4cout <<  " \n ========> " <<  G4endl; 
 	      G4cout <<  " \t Particle :" << (*GretinaCollection)[i]->GetParticleID() <<  G4endl; 
@@ -875,85 +876,85 @@ void Analysis::TreatGretina( GretinaHitDetectorCollection* GretinaCollection)
       }
 		
       // // Sort by Mutiplicty
-      for (G4int cl=0;cl<MaxClusG;cl++){
-		  for (G4int det=0;det<MaxDetG;det++){
-			 if( HitPatternG[cl][det] != 0 ){
-				DetClNr_G[DetM_G] = cl;
-				DetNr_G[DetM_G] = det;
-				DetE_G[DetM_G] = ECr_G[cl][det];
-				
-				if(FWHM_FLAG){
-				
-				  DetE_G[DetM_G]= detector->GetGretina()->FWHM_Response(DetE_G[DetM_G]);
-				  
-								
-				}
+      // A possibility of parallelization
+      // Only the outer loop would be parallelized, so would need to make sure that I am able to distribute
+      // MaxClusG among the threads.
 
-				
-				
-				
-				
-				// Calorimeter
-				TotalE_G += DetE_G[DetM_G];
+      //#pragma omp parallel for num_threads(8) reduction(+:TotalE_G)
+      for (G4int cl=0;cl<MaxClusG;cl++)
+      {
+      	for (G4int det=0;det<MaxDetG;det++)
+      	{
+				 if( HitPatternG[cl][det] != 0 ){
+				 	//DetM_G is a constant for each iteration (it is incremented in each iteration)
+					DetClNr_G[DetM_G] = cl;
+					DetNr_G[DetM_G] = det;
+					DetE_G[DetM_G] = ECr_G[cl][det];
+					
+					if(FWHM_FLAG)
+						DetE_G[DetM_G]= detector->GetGretina()->FWHM_Response(DetE_G[DetM_G]);
+					 
+					// Calorimeter
+					TotalE_G += DetE_G[DetM_G];
 				
 				// Check if Doppler Reconstruction is required
-				if(!detector->GetGretina()->DopplerOff()){
-				  
-				  // Position of the Heavy Ion
-				  switch(DC_IonPos){
-				  case 0 : // Mid-target
-					 Ion_Pos = Target_Pos;
-					 break;
-				  case 1 : // True decay Position - In Case of Cascade decay, last decay position
-					 Ion_Pos.setX(ion_dec.x[DecayM-1]*mm);
-					 Ion_Pos.setY(ion_dec.y[DecayM-1]*mm);
-					 Ion_Pos.setZ(ion_dec.z[DecayM-1]*mm);
-					 break;
-				  case 2 : // User Defined Position
-					 Ion_Pos=BeamOut->GetPosDopp();
-					 break;
-				  case 3 : // Mid-Degrader
-					 Ion_Pos = Degrader_Pos;
-					 break;
-				  case 4 : // Mid-Stopper
-					 Ion_Pos = Stopper_Pos;
-					 break;						
-				  }
-			 
-				  // Direction of the Heavy Ion
-				  switch(DC_IonAxis){
-				  case 0 : // z axis
-					 Ion_V.setZ(1.);
-					 Ion_V.setY(0.);
-					 Ion_V.setX(0.);
-					 break;
-				  case 1 : // Incomming Beam
-					 Ion_V.setZ(1./sqrt(1.+tan(BeamIn->getAta0())*tan(BeamIn->getAta0())+tan(BeamIn->getBta0())*tan(BeamIn->getBta0())));
-					 Ion_V.setY(tan(BeamIn->getBta0())*1./sqrt(1.+tan(BeamIn->getAta0())*tan(BeamIn->getAta0())+tan(BeamIn->getBta0())*tan(BeamIn->getBta0())));
-					 Ion_V.setX(tan(BeamIn->getAta0())*1./sqrt(1.+tan(BeamIn->getAta0())*tan(BeamIn->getAta0())+tan(BeamIn->getBta0())*tan(BeamIn->getBta0())));
-					 break;
-				  case 2 : // Decay - In Case of Cascade decay, last decay position
-					 Ion_V.setZ(1.);
-					 Ion_V.setTheta(ion_dec.theta[DecayM-1]);
-					 Ion_V.setPhi(ion_dec.phi[DecayM-1]);
-					 break;				
-				  case 3 : // Target back
-					 Ion_V.setZ(1.);
-					 Ion_V.setTheta(ion_ev[TARGET_BACK_FLAG].theta);
-					 Ion_V.setPhi(ion_ev[TARGET_BACK_FLAG].phi);
-					 break;	
-				  case 4 : // Degrader Back
-					 Ion_V.setZ(1.);
-					 Ion_V.setTheta(ion_ev[DEGRADER_BACK_FLAG].theta);
-					 Ion_V.setPhi(ion_ev[DEGRADER_BACK_FLAG].phi);
-					 break;				
-				  case 5 : // Stopper Back
-					 Ion_V.setZ(1.);
-					 Ion_V.setTheta(ion_ev[STOPPER_BACK_FLAG].theta);
-					 Ion_V.setPhi(ion_ev[STOPPER_BACK_FLAG].phi);
-					 break;	
-				  }
-				}
+					if(!detector->GetGretina()->DopplerOff()){
+					  
+					  // Position of the Heavy Ion
+					  switch(DC_IonPos){
+					  case 0 : // Mid-target
+						 Ion_Pos = Target_Pos;
+						 break;
+					  case 1 : // True decay Position - In Case of Cascade decay, last decay position
+						 Ion_Pos.setX(ion_dec.x[DecayM-1]*mm);
+						 Ion_Pos.setY(ion_dec.y[DecayM-1]*mm);
+						 Ion_Pos.setZ(ion_dec.z[DecayM-1]*mm);
+						 break;
+					  case 2 : // User Defined Position
+						 Ion_Pos=BeamOut->GetPosDopp();
+						 break;
+					  case 3 : // Mid-Degrader
+						 Ion_Pos = Degrader_Pos;
+						 break;
+					  case 4 : // Mid-Stopper
+						 Ion_Pos = Stopper_Pos;
+						 break;						
+					  }
+				 
+					  // Direction of the Heavy Ion
+					  switch(DC_IonAxis){
+					  case 0 : // z axis
+						 Ion_V.setZ(1.);
+						 Ion_V.setY(0.);
+						 Ion_V.setX(0.);
+						 break;
+					  case 1 : // Incomming Beam
+						 Ion_V.setZ(1./sqrt(1.+tan(BeamIn->getAta0())*tan(BeamIn->getAta0())+tan(BeamIn->getBta0())*tan(BeamIn->getBta0())));
+						 Ion_V.setY(tan(BeamIn->getBta0())*1./sqrt(1.+tan(BeamIn->getAta0())*tan(BeamIn->getAta0())+tan(BeamIn->getBta0())*tan(BeamIn->getBta0())));
+						 Ion_V.setX(tan(BeamIn->getAta0())*1./sqrt(1.+tan(BeamIn->getAta0())*tan(BeamIn->getAta0())+tan(BeamIn->getBta0())*tan(BeamIn->getBta0())));
+						 break;
+					  case 2 : // Decay - In Case of Cascade decay, last decay position
+						 Ion_V.setZ(1.);
+						 Ion_V.setTheta(ion_dec.theta[DecayM-1]);
+						 Ion_V.setPhi(ion_dec.phi[DecayM-1]);
+						 break;				
+					  case 3 : // Target back
+						 Ion_V.setZ(1.);
+						 Ion_V.setTheta(ion_ev[TARGET_BACK_FLAG].theta);
+						 Ion_V.setPhi(ion_ev[TARGET_BACK_FLAG].phi);
+						 break;	
+					  case 4 : // Degrader Back
+						 Ion_V.setZ(1.);
+						 Ion_V.setTheta(ion_ev[DEGRADER_BACK_FLAG].theta);
+						 Ion_V.setPhi(ion_ev[DEGRADER_BACK_FLAG].phi);
+						 break;				
+					  case 5 : // Stopper Back
+						 Ion_V.setZ(1.);
+						 Ion_V.setTheta(ion_ev[STOPPER_BACK_FLAG].theta);
+						 Ion_V.setPhi(ion_ev[STOPPER_BACK_FLAG].phi);
+						 break;	
+					  }
+					}
 				
 				bool Trackfound = false;
 				if(GRETINA_TRACK_FLAG == TRUE){			  
@@ -982,10 +983,9 @@ void Analysis::TreatGretina( GretinaHitDetectorCollection* GretinaCollection)
 				  Gamma_Pos.setX(G4RandGauss::shoot(Gamma_TruePos.getX()/mm, DC_Gretina_Pos_Sigma )*mm);
 				  Gamma_Pos.setY(G4RandGauss::shoot(Gamma_TruePos.getY()/mm, DC_Gretina_Pos_Sigma )*mm);
 				  Gamma_Pos.setZ(G4RandGauss::shoot(Gamma_TruePos.getZ()/mm, DC_Gretina_Pos_Sigma )*mm);
-				}else{
-				  Gamma_Pos = Gamma_TruePos;					 
 				}
-				
+				else
+				  Gamma_Pos = Gamma_TruePos;					 
 				
 #ifdef DEBUG
 				G4cout << " Simulated Position          " << Gamma_Pos.getX()/cm << "cm " << Gamma_Pos.getY()/cm  << "cm " << Gamma_Pos.getZ()/cm << "cm - " << Gamma_Pos.getR()/cm  << "cm " << Gamma_Pos.getTheta()/deg  << "deg " << Gamma_Pos.getPhi()/deg  << "deg "  << endl; 
@@ -1122,56 +1122,51 @@ void Analysis::TreatGretina( GretinaHitDetectorCollection* GretinaCollection)
 
     for(int i=0;i<DetM_G;i++){
     
-      CorrectedE.push_back(empty);
-      if(DetE_G[i]>GammaKnown_Low && DetE_G[i]<GammaKnown_High)
-	{
-	  LabE_GammaKnown = DetE_G[i];
-	  Z_Tar_GammaKnown = Z_G[i]*10; //now in mm.
-	  R_Tar_GammaKnown = R_G[i]*10; //now in mm.  
-	  Rho_Tar_GammaKnown = sqrt(R_Tar_GammaKnown*R_Tar_GammaKnown-Z_Tar_GammaKnown*Z_Tar_GammaKnown);
-	  Z_Origin_Tar = Target_Pos.getZ()/mm;  //in mm
+				  CorrectedE.push_back(empty);
+				  if(DetE_G[i]>GammaKnown_Low && DetE_G[i]<GammaKnown_High)
+					{
+					  LabE_GammaKnown = DetE_G[i];
+					  Z_Tar_GammaKnown = Z_G[i]*10; //now in mm.
+					  R_Tar_GammaKnown = R_G[i]*10; //now in mm.  
+					  Rho_Tar_GammaKnown = sqrt(R_Tar_GammaKnown*R_Tar_GammaKnown-Z_Tar_GammaKnown*Z_Tar_GammaKnown);
+					  Z_Origin_Tar = Target_Pos.getZ()/mm;  //in mm
 
-	  RelGamma = 1/sqrt(1-beta_r*beta_r);
-	  Theta_GammaKnown = acos((1-(TrueE_GammaKnown)/(RelGamma*LabE_GammaKnown))/beta_r);
-	  Z_Decay_GammaKnown = Rho_Tar_GammaKnown/tan(Theta_GammaKnown);
-	  Z_Tar_Decay = Z_Tar_GammaKnown-Z_Decay_GammaKnown;
-	  CascadeZ.push_back(Z_Tar_Decay);
+					  RelGamma = 1/sqrt(1-beta_r*beta_r);
+					  Theta_GammaKnown = acos((1-(TrueE_GammaKnown)/(RelGamma*LabE_GammaKnown))/beta_r);
+					  Z_Decay_GammaKnown = Rho_Tar_GammaKnown/tan(Theta_GammaKnown);
+					  Z_Tar_Decay = Z_Tar_GammaKnown-Z_Decay_GammaKnown;
+					  CascadeZ.push_back(Z_Tar_Decay);
 
-	  for(int j=0;j<DetM_G;j++)
-	    {
-	      if(j!=i)
-		{
-		  LabE_GammaOfInterest = DetE_G[j];
-		  Z_Tar_GammaOfInterest = Z_G[j]*10;
-		  R_Tar_GammaOfInterest = R_G[j]*10;
-		  Rho_Tar_GammaOfInterest = sqrt(R_Tar_GammaOfInterest*R_Tar_GammaOfInterest-Z_Tar_GammaOfInterest*Z_Tar_GammaOfInterest);
-		  Z_Decay_GammaOfInterest = -CascadeZ.back()+Z_Tar_GammaOfInterest;
-		  Theta_GammaOfInterest = atan(Rho_Tar_GammaOfInterest/Z_Decay_GammaOfInterest);
-		  // atan is arbitrary for its return value.  
-		  // If it returns a value between -pi and 0, 
-		  // we change it into the corresponding 
-		  // value between 0 and +pi.  
-		  if(Theta_GammaOfInterest<0)
-		    {
-		      Theta_GammaOfInterest = Theta_GammaOfInterest+pi;
-		    }
-		  CorrectedE[i].push_back(LabE_GammaOfInterest*RelGamma*(1-beta_r*cos(Theta_GammaOfInterest)));
+					  for(int j=0;j<DetM_G;j++)
+					  {
+					      if(j!=i){
+								  LabE_GammaOfInterest = DetE_G[j];
+								  Z_Tar_GammaOfInterest = Z_G[j]*10;
+								  R_Tar_GammaOfInterest = R_G[j]*10;
+								  Rho_Tar_GammaOfInterest = sqrt(R_Tar_GammaOfInterest*R_Tar_GammaOfInterest-Z_Tar_GammaOfInterest*Z_Tar_GammaOfInterest);
+								  Z_Decay_GammaOfInterest = -CascadeZ.back()+Z_Tar_GammaOfInterest;
+								  Theta_GammaOfInterest = atan(Rho_Tar_GammaOfInterest/Z_Decay_GammaOfInterest);
+								  // atan is arbitrary for its return value.  
+								  // If it returns a value between -pi and 0, 
+								  // we change it into the corresponding 
+								  // value between 0 and +pi.  
+								  if(Theta_GammaOfInterest<0)
+								  	Theta_GammaOfInterest = Theta_GammaOfInterest+pi;
+								    
+								  CorrectedE[i].push_back(LabE_GammaOfInterest*RelGamma*(1-beta_r*cos(Theta_GammaOfInterest)));
 
+								}
+							  
+							  else
+								  CorrectedE[i].push_back(-1000.);
+						}
+							  
+					}
+						    else
+							  	CascadeZ.push_back(-1000);
 		}
-	      else
-		{
-		  CorrectedE[i].push_back(-1000.);
-		}
-	    }
-	  
 	}
-      else
-	{
-	  CascadeZ.push_back(-1000);
-	}
-    }
-  }
-}
+						}
 
 
 //AR New in v4.3 -> To determine the depth parameter
@@ -1191,11 +1186,10 @@ G4double Analysis::GetDepth(G4ThreeVector pos, G4double Tz){
   pos1.set(u1*pos.getX(),u1*pos.getY(),Tz + u1*(pos.getZ()-Tz));
   pos2.set(u2*pos.getX(),u2*pos.getY(),Tz + u2*(pos.getZ()-Tz));
 
-  if((pos-pos1).mag()<(pos-pos2).mag()){
+  if((pos-pos1).mag()<(pos-pos2).mag())
     depth = (pos-pos1).mag();
-  }else{
+  else
     depth = (pos-pos2).mag();
-  }
   
   return depth;
 }
@@ -1220,22 +1214,25 @@ void Analysis::AddbackMode3Simple(void){
     int j=0;
 
     while(j<MaxDet){
-
-      if (j!=maxpos&& GetDistance(maxpos,j)<MaxDist){ //Simply tests to see if a point already in the region is within some distance from another point
+      if (j!=maxpos&& GetDistance(maxpos,j)<MaxDist)
+      { //Simply tests to see if a point already in the region is within some distance from another point
 	//	cout <<"Distance is " <<  GetDistance(highenmult,j) << endl;
-	unsigned int k=0;
-	bool untested=true;//
-	while(k<tested.size()){
-	  unsigned int m=0;
-	  while(m<tested.at(k).size()){
-	    if (j==tested.at(k).at(m)){untested=false;cout << "false"<< endl;}
-	    m++;}//Here if the hit is already in the vector we skip the hit
-	k++;}
-		if(untested){//If the hit is not in the tested vector we add it in so that it will also be looped over		  	 
-		  summed.push_back(j);multinsum++;numtested++;}
-       }	
-     j++;
-     }
+				unsigned int k=0;
+				bool untested=true;//
+				while(k<tested.size()){
+				  unsigned int m=0;
+				  while(m<tested.at(k).size()){
+				    if (j==tested.at(k).at(m))
+				    	untested=false;cout << "false"<< endl;
+				    m++;
+				  }//Here if the hit is already in the vector we skip the hit
+					k++;
+				}
+					if(untested){//If the hit is not in the tested vector we add it in so that it will also be looped over		  	 
+					  summed.push_back(j);multinsum++;numtested++;}
+			}	
+    	j++;
+    }
     //    cout << numtested << endl;
     //    cout << MaxDet;
     tested.push_back(summed);
@@ -1244,10 +1241,13 @@ void Analysis::AddbackMode3Simple(void){
     
   }
 
+  // Possibility for another parallelized region
+  // pragma omp parallel for num_threads(8) reduction(+:ensum)
+  // Could parallelize both outer loop and the inner for loop. 
   for(unsigned int  it=0; it!=tested.size(); it++){
     G4double ensum=0;
-    for(unsigned int it2=0; it2!=tested.at(it).size();it2++){
-      ensum+=DetE_G[tested.at(it).at(it2)];}
+    for(unsigned int it2=0; it2!=tested.at(it).size();it2++)
+      ensum+=DetE_G[tested.at(it).at(it2)];
 
     ensum=ensum* 1.0/(sqrt(1-pow(addbackbeta,2))) * (1-addbackbeta*CosSeg_G[tested.at(it).at(0)]);
 
@@ -1314,6 +1314,8 @@ void Analysis::AddbackMode3Simple(GretinaHitDetectorCollection* ghdc){
     maxpos=GetLargestRemaining(tested,ghdc);
   }
 
+  // Possibility for parallel region
+  // pragma omp parallel for num_threads(8) reduction(+:ensum)
   for(unsigned int  it=0; it<tested.size(); it++){
     G4double ensum=0;
     for(unsigned int it2=0; it2!=tested.at(it).size();it2++){
@@ -1334,9 +1336,11 @@ void Analysis::AddbackMode3Simple(GretinaHitDetectorCollection* ghdc){
       AddbackPos[it].setY(G4RandGauss::shoot(AddbackPos[it].getY()/mm, DC_Gretina_Pos_Sigma )*mm);
       AddbackPos[it].setZ(G4RandGauss::shoot(AddbackPos[it].getZ()/mm, DC_Gretina_Pos_Sigma )*mm);
     }
+    
     else{
       ;
     }
+	
 
     ensum=ensum* 1.0/(sqrt(1-pow(addbackbeta,2))) * (1-addbackbeta*GetCosTheta((*ghdc)[tested.at(it).at(0)]->GetPos()));
 
