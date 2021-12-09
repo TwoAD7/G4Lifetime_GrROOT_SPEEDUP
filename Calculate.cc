@@ -347,7 +347,7 @@ int main(int argc, char* argv[]){
     this could also be parallelized. In the mean time, it is going to be run serially.
     */
     for(int i =0;i< thd_cnt;i++){
-      splittree_i = splittree.at(i);
+      vector<vector<TTree*> > splittree_i = splittree.at(i);
       S800Calc* s800Calc = S800Calc_objs.at(i);
       GretinaCalc* gretinaCalc = gretinaCalc_objs.at(i);
       GretinaEvent* gretinaEvent = gretinaEvent_objs.at(i);
@@ -405,8 +405,12 @@ int main(int argc, char* argv[]){
 
   #pragma omp parallel for num_threads(max_threads) private(status) reduction(+:nbytes)
   for(int i=0; i<nentries; i++){
+
+    //Commented this out because can't have break statements in OMP
+    /*
     if(signal_received)
       break;
+    */
 
     if(set->VLevel()>2){
       cout << "-----------------------------------------"<< endl;
@@ -454,6 +458,8 @@ int main(int argc, char* argv[]){
     */
     status = gtr->GetEvent(i);
 
+    // This is invalid exit for OMP. Will have to figure this out if I want to include this.
+    /*
     if(status == -1){
       cerr<<"Error occured, couldn't read entry "<<i<<" from tree "<<gtr->GetName()<<" in file "<<infile->GetName()<<endl;
       return 5;
@@ -462,6 +468,7 @@ int main(int argc, char* argv[]){
       cerr<<"Error occured, entry "<<i<<" in tree "<<gtr->GetName()<<" in file "<<infile->GetName()<<" doesn't exist"<<endl;
       return 6;
     }
+    */
 
     //There will be a data race with this variable
     nbytes += status;
@@ -476,7 +483,7 @@ int main(int argc, char* argv[]){
       s800Calc,gretinaCalc,mode3Calc);
     */
     cal_objs.at(ID)->BuildAllCalc(s800_objs.at(ID),gretina_objs.at(ID),m3e_objs.at(ID),
-      s800Calc_objs.at(ID),gretinaCalc_objs.at(ID),mode3Calc_objs.at(ID))
+      S800Calc_objs.at(ID),gretinaCalc_objs.at(ID),mode3Calc_objs.at(ID))
 
     if(trackMe){
       // cal->GammaTrack(gretinaCalc,gretinaEvent)
@@ -547,7 +554,7 @@ int main(int argc, char* argv[]){
   TList *ctr_list = new TList;
   int size = cal_objs.size();
   for(int i =0;i<size;i++){
-    cal_list->Add(cal_objs.at(i));
+    //cal_list->Add(cal_objs.at(i));
     ctr_list->Add(ctr_objs.at(i)); 
   }
 
