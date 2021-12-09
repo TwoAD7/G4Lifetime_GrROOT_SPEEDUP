@@ -483,7 +483,7 @@ int main(int argc, char* argv[]){
       s800Calc,gretinaCalc,mode3Calc);
     */
     cal_objs.at(ID)->BuildAllCalc(s800_objs.at(ID),gretina_objs.at(ID),m3e_objs.at(ID),
-      S800Calc_objs.at(ID),gretinaCalc_objs.at(ID),mode3Calc_objs.at(ID))
+      S800Calc_objs.at(ID),gretinaCalc_objs.at(ID),mode3Calc_objs.at(ID));
 
     if(trackMe){
       // cal->GammaTrack(gretinaCalc,gretinaEvent)
@@ -530,18 +530,18 @@ int main(int argc, char* argv[]){
     //Parallel Version
     else{
       for(UShort_t in=0;in<InPartCut.size();in++){ // loop over incoming cuts
-        if(tac%2 == 1 && !InPartCut[in]->IsInside(s800Calc_objs.at(ID)->GetTOF()->GetOBJ(),s800Calc_objs.at(ID)->GetTOF()->GetXFP()))
+        if(tac%2 == 1 && !InPartCut[in]->IsInside(S800Calc_objs.at(ID)->GetTOF()->GetOBJ(),S800Calc_objs.at(ID)->GetTOF()->GetXFP()))
           continue;
-        if(tac%2 == 0 && !InPartCut[in]->IsInside(s800Calc_objs.at(ID)->GetTOF()->GetTACOBJ(),s800Calc_objs.at(ID)->GetTOF()->GetTACXFP()))
+        if(tac%2 == 0 && !InPartCut[in]->IsInside(S800Calc_objs.at(ID)->GetTOF()->GetTACOBJ(),S800Calc_objs.at(ID)->GetTOF()->GetTACXFP()))
           continue;
         for(UShort_t ou=0;ou<OutPartCut[in].size();ou++){ // loop over PID cuts
-          if(tac == 1 && !OutPartCut[in][ou]->IsInside(s800Calc_objs.at(ID)->GetTOF()->GetOBJC(),s800Calc_objs.at(ID)->GetIC()->GetDE()))
+          if(tac == 1 && !OutPartCut[in][ou]->IsInside(S800Calc_objs.at(ID)->GetTOF()->GetOBJC(),S800Calc_objs.at(ID)->GetIC()->GetDE()))
             continue;
-          if(tac == 0 && !OutPartCut[in][ou]->IsInside(s800Calc_objs.at(ID)->GetTOF()->GetTACOBJC(),s800Calc_objs.at(ID)->GetIC()->GetDE()))
+          if(tac == 0 && !OutPartCut[in][ou]->IsInside(S800Calc_objs.at(ID)->GetTOF()->GetTACOBJC(),S800Calc_objs.at(ID)->GetIC()->GetDE()))
             continue;
-          if(tac == 3 && !OutPartCut[in][ou]->IsInside(s800Calc_objs.at(ID)->GetTOF()->GetXFPC(),s800Calc_objs.at(ID)->GetIC()->GetDE()))
+          if(tac == 3 && !OutPartCut[in][ou]->IsInside(S800Calc_objs.at(ID)->GetTOF()->GetXFPC(),S800Calc_objs.at(ID)->GetIC()->GetDE()))
             continue;
-          if(tac == 2 && !OutPartCut[in][ou]->IsInside(s800Calc_objs.at(ID)->GetTOF()->GetTACXFPC(),s800Calc_objs.at(ID)->GetIC()->GetDE()))
+          if(tac == 2 && !OutPartCut[in][ou]->IsInside(S800Calc_objs.at(ID)->GetTOF()->GetTACXFPC(),S800Calc_objs.at(ID)->GetIC()->GetDE()))
             continue;
           splittree.at(ID)[in][ou]->Fill();
           } 
@@ -561,7 +561,7 @@ int main(int argc, char* argv[]){
   TTree *ctr =  TTree::MergeTrees(ctr_list);
 
   info->SetEntries(nentries);
-  print("PAST THE PARALLELIZATION AND SET NENTRIES")
+  printf("PAST THE PARALLELIZATION AND SET NENTRIES")
   /*
   info->SetCounters(cal->GetICHCtr(),cal->GetHodoCtr(),cal->GetCARD29Ctr(),cal->GetGRETACtr(),cal->GetSCINTCtr());
   info->SetEff(cal->GetICHCtr(),cal->GetOBJCtr(),cal->GetXFPCtr(),cal->GetTOFCtr(),cal->GetPADCtr(),
