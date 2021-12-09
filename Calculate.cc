@@ -403,8 +403,9 @@ int main(int argc, char* argv[]){
   int max_threads = omp_get_max_threads();
   printf("MAX NUMBER OF THREADS: %d\n",max_threads);
 
-  #pragma omp parallel for num_threads(max_threads) private(status) reduction(+:nbytes)
-  for(int i=0; i<nentries; i++){
+  int nent = (int)gtr->GetEntries();
+  #pragma omp parallel for num_threads(max_threads) private(status) shared(ctr_objs,S800Calc_objs,gretinaCalc_objs,gretinaEvent_objs,mode3Calc_objs,s800_objs,gretina_objs,m3e_objs) reduction(+:nbytes)
+  for(int i=0; i<nent; i++){
 
     //Commented this out because can't have break statements in OMP
     /*
@@ -561,7 +562,7 @@ int main(int argc, char* argv[]){
   TTree *ctr =  TTree::MergeTrees(ctr_list);
 
   info->SetEntries(nentries);
-  printf("PAST THE PARALLELIZATION AND SET NENTRIES")
+  printf("PAST THE PARALLELIZATION AND SET NENTRIES");
   /*
   info->SetCounters(cal->GetICHCtr(),cal->GetHodoCtr(),cal->GetCARD29Ctr(),cal->GetGRETACtr(),cal->GetSCINTCtr());
   info->SetEff(cal->GetICHCtr(),cal->GetOBJCtr(),cal->GetXFPCtr(),cal->GetTOFCtr(),cal->GetPADCtr(),
@@ -577,8 +578,10 @@ int main(int argc, char* argv[]){
   else{
     for(UShort_t in=0;in<InPartCut.size();in++){ // loop over incoming cuts
       for(UShort_t ou=0;ou<OutPartCut[in].size();ou++){ // loop over PID cuts
-        splittree[in][ou]->Write("",TObject::kOverwrite);
-        filesize += splittree[in][ou]->GetZipBytes();
+        //splittree[in][ou]->Write("",TObject::kOverwrite);
+        //filesize += splittree[in][ou]->GetZipBytes();
+        splittree.at(0)[in][ou]->Write("",TObject::kOverwrite);
+        filesize += splittree.at(0)[in][ou]->GetZipBytes();
       }
     }
   }
