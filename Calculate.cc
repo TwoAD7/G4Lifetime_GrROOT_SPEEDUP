@@ -277,7 +277,7 @@ int main(int argc, char* argv[]){
     ctr_objs.at(i)->Branch("s800calc",&s800Calc, 320000);
     ctr_objs.at(i)->Branch("gretinacalc",&gretinaCalc, 320000);
     if(trackMe)
-    ctr_objs.at(i)->Branch("gretinaevent",&gretinaEvent, 320000);
+      ctr_objs.at(i)->Branch("gretinaevent",&gretinaEvent, 320000);
     ctr_objs.at(i)->Branch("mode3calc",&mode3Calc, 320000);
     ctr_objs.at(i)->BranchRef();
   }
