@@ -40,6 +40,7 @@
 #include <vector>
 #include <sys/time.h> 
 #include <signal.h>
+#include <omp.h>
 
 #include "TFile.h"
 #include "TChain.h"
@@ -119,6 +120,7 @@ int main(int argc, char* argv[]){
 
 
 
+  //gtr is the input TTree
   TFile* infile = new TFile(InputFile);
   TTree* gtr = (TTree*) infile->Get("gtr");
   if(gtr == NULL){
@@ -173,6 +175,12 @@ int main(int argc, char* argv[]){
   cout << "Brho " << cal->GetBrho() << " mass " <<  cal->GetMass() << " Z " << cal->GetZ() << endl;
   info->SetBeam(cal->GetBrho(), cal->GetMass(), cal->GetZ());
 
+  vector<Calibration*> cal_objs;
+  for(int i =0;i< thd_cnt;i++){
+    cal_objs.emplace_back(new Calibration(set,startevent,RunNumber));
+}
+
+  /*
   TTree* ctr = new TTree("ctr","Gretina/S800 calibrated and builtevents");
   S800Calc* s800Calc = new S800Calc;
   GretinaCalc* gretinaCalc = new GretinaCalc;
@@ -184,10 +192,55 @@ int main(int argc, char* argv[]){
     ctr->Branch("gretinaevent",&gretinaEvent, 320000);
   ctr->Branch("mode3calc",&mode3Calc, 320000);
   ctr->BranchRef();
+  */
+
+  
+  // ============ Section generating separate TTrees for Parallelization Purposes ============ //
+  std::vector<TTree*> ctr_objs;
+  std::vector<S800Calc*> S800Calc_objs;
+  std::vector<GretinaCalc*> gretinaCalc_objs;
+  std::vector<GretinaEvent*> gretinaEvent_objs;
+  std::vector<Mode3Calc*> mode3Calc_objs;
+  int thd_cnt =  omp_get_max_threads();
+
+  //Generatate all the data objects that are going to be branches in each TTree
+  for(int i=0;i<thd_cnt;i++){
+    S800Calc_objs.emplace_back(new S800Calc);
+    gretinaCalc_objs.emplace_back(new GretinaCalc);
+    gretinaEvent_objs.emplace_back(new GretinaEvent);
+    mode3Calc_objs.emplace_back(new Mode3Calc);
+  }
+  
+
+    
+  //Create vector containing TTrees. We make a TTree for each thread.
+  for(int i =0;i< thd_cnt;i++){
+    //hists[i] = new TH1D(Form("Hist%d",i),"Histogram",1000,0,1000);
+    ctr_objs.emplace_back(new TTree(Form("ctr%d",i),"Gretina/S800 calibrated and builtevents"));
+    S800Calc* s800Calc = S800Calc_objs.at(i);
+    GretinaCalc* gretinaCalc = gretinaCalc_objs.at(i);
+    GretinaEvent* gretinaEvent = gretinaEvent_objs.at(i);
+    Mode3Calc* mode3Calc = mode3Calc_objs.at(i);
+
+    //Set different memory addresses for each branch in each different TTree
+    ctr_objs.at(i)->Branch("s800calc",&s800Calc, 320000);
+    ctr_objs.at(i)->Branch("gretinacalc",&gretinaCalc, 320000);
+    if(trackMe)
+    ctr_objs.at(i)->Branch("gretinaevent",&gretinaEvent, 320000);
+    ctr_objs.at(i)->Branch("mode3calc",&mode3Calc, 320000);
+    ctr_objs.at(i)->BranchRef();
+  }
+  
+
+
 
   vector<TCutG*> InPartCut;
   vector<vector<TCutG*> > OutPartCut;
-  vector<vector<TTree*> > splittree;
+  //vector<vector<TTree*> > splittree;
+  vector<vector<vector<TTree*> > > splittree;
+  
+
+
   if(CutFile!=NULL){
     cout << "Cuts were created for ";
     if(tac%2==0)
@@ -235,20 +288,32 @@ int main(int argc, char* argv[]){
     }
     cFile->Close();
     ofile->cd();
-    splittree.resize(InPartCut.size());
-    for(UShort_t in=0;in<InPartCut.size();in++){ // loop over incoming cuts
-      splittree[in].resize(OutPartCut[in].size());
-      for(UShort_t ou=0;ou<OutPartCut[in].size();ou++){ // loop over PID cuts
-	splittree[in][ou] = new TTree(Form("ctr_%s",OutPartCut[in][ou]->GetName()),"Gretina/S800 calibrated and builtevents");
-	splittree[in][ou]->Branch("s800calc",&s800Calc, 320000);
-	splittree[in][ou]->Branch("gretinacalc",&gretinaCalc, 320000);
-	if(trackMe)
-	  splittree[in][ou]->Branch("gretinaevent",&gretinaEvent, 320000);
-	splittree[in][ou]->Branch("mode3calc",&mode3Calc, 320000);
-	splittree[in][ou]->BranchRef();
+
+
+    // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    /*
+    NOTE: Could time this and see how long this takes. If further improvements in timing are necessary, 
+    this could also be parallelized. In the mean time, it is going to be run serially.
+    */
+    for(int i =0;i< thd_cnt;i++){
+      splittree_i = splittree.at(i);
+      splittree_i.resize(InPartCut.size());
+      for(UShort_t in=0;in<InPartCut.size();in++){ // loop over incoming cuts
+        splittree_i[in].resize(OutPartCut[in].size());
+        for(UShort_t ou=0;ou<OutPartCut[in].size();ou++){ // loop over PID cuts
+        	splittree_i[in][ou] = new TTree(Form("ctr_%s",OutPartCut[in][ou]->GetName()),"Gretina/S800 calibrated and builtevents");
+        	splittree_i[in][ou]->Branch("s800calc",&s800Calc, 320000);
+        	splittree_i[in][ou]->Branch("gretinacalc",&gretinaCalc, 320000);
+        	if(trackMe)
+        	  splittree_i[in][ou]->Branch("gretinaevent",&gretinaEvent, 320000);
+        	splittree_i[in][ou]->Branch("mode3calc",&mode3Calc, 320000);
+  	      splittree_i[in][ou]->BranchRef();
+        }
       }
     }
   }
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
   Double_t nentries = gtr->GetEntries();
   Int_t nbytes = 0;
   Int_t status;
@@ -262,24 +327,51 @@ int main(int argc, char* argv[]){
   if(nentries != gtr->GetEntries()){
     cout << "reading only first " << nentries << " events " << endl;
   }
+
+  /*
+  //After creating the input the Trees, make a copy for each thread by pushing them into the vector
+  // NOTE: The current issue with doing this is that all of the cloned TTrees would have 
+  // the same branch address and would all write to the same memory location in the foor loop
+  // creating a data race
+  std::vector<TTree*> ctr_objs;
+  int thd_cnt =  omp_get_max_threads();
+
+  for(int i=0;i<thd_cnt;i++){
+    ctr_objs.emplace_back((TTree*)ctr->CloneTree());
+  }
+
+*/
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// This is a for loop that goes over all the enties. THIS WOULD NEED TO BE PARALLELIZED
+
+  int max_threads = omp_get_max_threads();
+  printf("MAX NUMBER OF THREADS: %d\n",max_threads);
+
+  #pragma omp parallel for num_threads(max_threads)
   for(int i=0; i<nentries; i++){
-    if(signal_received){
+    if(signal_received)
       break;
-    }
+
     if(set->VLevel()>2){
       cout << "-----------------------------------------"<< endl;
       cout << "processing event " << i << endl;
     }
-    if(i%10000 == 0){
+    int ID = omp_get_thread_num();
+    if(i%10000 == 0 && ID == 0){
       //cal->PrintCtrs();
       double time_end = get_time();
       cout << setw(5) << setiosflags(ios::fixed) << setprecision(1) << (100.*i)/nentries<<" % done\t" << 
-	(Float_t)i/(time_end - time_start) << " events/s " <<
-	(nentries-i)*(time_end - time_start)/(Float_t)i << "s to go \r" << flush;
+      (Float_t)i/(time_end - time_start) << " events/s " << (nentries-i)*(time_end - time_start)/(Float_t)i << "s to go \r" << flush;
     }
-    if(i%1000000 == 0 && CutFile==NULL)
-      ctr->AutoSave();
-    
+    if(i%1000000 == 0 && CutFile==NULL){
+      //ctr->AutoSave();
+      ctr_objs.at(ID)->AutoSave();
+    }
+
+
+    /*
+    //It clears all of the data entries in that object
     s800Calc->Clear();
     gretinaCalc->Clear();
     gretinaEvent->Clear();
@@ -287,7 +379,21 @@ int main(int argc, char* argv[]){
     s800->Clear();
     gretina->Clear();
     m3e->Clear();
- 
+    */
+
+    S800Calc_objs.at(ID)->Clear();
+    gretinaCalc_objs.at(ID)->Clear();
+    gretinaEvent_objs.at(ID)->Clear();
+    mode3Calc_objs.at(ID)->Clear();
+
+
+
+    //For the entry "i", grab the event that occured from the TTree gtr (input tree)
+    /*
+    
+    In using omp parallel for, the threads get the "ith" iteration (i.e. each loop doesn't start from 0, it starts on the true value)
+
+    */
     status = gtr->GetEvent(i);
 
     if(status == -1){
@@ -298,44 +404,60 @@ int main(int argc, char* argv[]){
       cerr<<"Error occured, entry "<<i<<" in tree "<<gtr->GetName()<<" in file "<<infile->GetName()<<" doesn't exist"<<endl;
       return 6;
     }
+
+    //There will be a data race with this variable
     nbytes += status;
 
 
 
     //Build all of the calibrated objects, using the calibration in cal.
     //Use the data from the first three parameters, output into the last three parameters.
-    
     cal->BuildAllCalc(s800,gretina,m3e,
-		      s800Calc,gretinaCalc,mode3Calc);
+      s800Calc,gretinaCalc,mode3Calc);
+    
+
     if(trackMe)
       cal->GammaTrack(gretinaCalc,gretinaEvent);
 
-    if(CutFile==NULL)
+    // ctr is a TTree that we are filling with the calibrated data. The TTree::Fill() fills all the branches 
+    /*
+    If one were to create a parallel loop as is, the if-statement that follows would result in a seg fault due to the data 
+    race that would take place (i.e. all of the threads would be writing to the same memory location, screwing things up, creating the 
+    data race). 
+
+    To overcome the data race, a good idea to try is to make individual TTree objects for each thread, and then at the end of the for loop,
+    merge all of the TTrees together. 
+
+    */
+    if(CutFile==NULL){
       ctr->Fill();
+    }
     else{
       for(UShort_t in=0;in<InPartCut.size();in++){ // loop over incoming cuts
-	if(tac%2 == 1 && !InPartCut[in]->IsInside(s800Calc->GetTOF()->GetOBJ(),s800Calc->GetTOF()->GetXFP()))
-	  continue;
-	if(tac%2 == 0 && !InPartCut[in]->IsInside(s800Calc->GetTOF()->GetTACOBJ(),s800Calc->GetTOF()->GetTACXFP()))
-	  continue;
-	for(UShort_t ou=0;ou<OutPartCut[in].size();ou++){ // loop over PID cuts
-	  if(tac == 1 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetOBJC(),s800Calc->GetIC()->GetDE()))
-	    continue;
-	  if(tac == 0 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetTACOBJC(),s800Calc->GetIC()->GetDE()))
-	    continue;
-	  if(tac == 3 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetXFPC(),s800Calc->GetIC()->GetDE()))
-	    continue;
-	  if(tac == 2 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetTACXFPC(),s800Calc->GetIC()->GetDE()))
-	    continue;
-	  splittree[in][ou]->Fill();
-	}	
-      }
+        if(tac%2 == 1 && !InPartCut[in]->IsInside(s800Calc->GetTOF()->GetOBJ(),s800Calc->GetTOF()->GetXFP()))
+          continue;
+        if(tac%2 == 0 && !InPartCut[in]->IsInside(s800Calc->GetTOF()->GetTACOBJ(),s800Calc->GetTOF()->GetTACXFP()))
+          continue;
+        for(UShort_t ou=0;ou<OutPartCut[in].size();ou++){ // loop over PID cuts
+          if(tac == 1 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetOBJC(),s800Calc->GetIC()->GetDE()))
+            continue;
+          if(tac == 0 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetTACOBJC(),s800Calc->GetIC()->GetDE()))
+            continue;
+          if(tac == 3 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetXFPC(),s800Calc->GetIC()->GetDE()))
+            continue;
+          if(tac == 2 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetTACXFPC(),s800Calc->GetIC()->GetDE()))
+            continue;
+          splittree[in][ou]->Fill();
+          }	
+        }
     }//split tree
   }
+
+
   info->SetEntries(nentries);
   info->SetCounters(cal->GetICHCtr(),cal->GetHodoCtr(),cal->GetCARD29Ctr(),cal->GetGRETACtr(),cal->GetSCINTCtr());
   info->SetEff(cal->GetICHCtr(),cal->GetOBJCtr(),cal->GetXFPCtr(),cal->GetTOFCtr(),cal->GetPADCtr(),
-	       cal->GetTRACKCtr(),cal->GetPPACCtr(),cal->GetIITRACKCtr(),cal->GetCARD29Ctr(),cal->GetSCINTCtr());
+	cal->GetTRACKCtr(),cal->GetPPACCtr(),cal->GetIITRACKCtr(),cal->GetCARD29Ctr(),cal->GetSCINTCtr());
   cout << endl;
   
   Long64_t filesize =0;
@@ -346,11 +468,13 @@ int main(int argc, char* argv[]){
   else{
     for(UShort_t in=0;in<InPartCut.size();in++){ // loop over incoming cuts
       for(UShort_t ou=0;ou<OutPartCut[in].size();ou++){ // loop over PID cuts
-	splittree[in][ou]->Write("",TObject::kOverwrite);
-	filesize += splittree[in][ou]->GetZipBytes();
+        splittree[in][ou]->Write("",TObject::kOverwrite);
+        filesize += splittree[in][ou]->GetZipBytes();
       }
     }
   }
+
+
   info->Write("runinfo",TObject::kOverwrite);
   cout <<  endl;
   cout << "closing file ..." << endl;
