@@ -162,7 +162,10 @@ int main(int argc, char* argv[]){
   std::vector<Mode3Event*> m3e_objs;
   int thd_cnt =  omp_get_max_threads();
   //int thd_cnt = 4;
-
+  
+  NOTE:
+  We did not go with this due to cloning the input TTree would take too much disk space. 
+  
 
   //Clone the input TTree into each one
   cout<<"CLONING GTR TREES\n";
@@ -252,7 +255,9 @@ int main(int argc, char* argv[]){
 
   // The parallel Version
   vector<Calibration*> cal_objs;
-  int thd_cnt =  omp_get_max_threads();
+  //int thd_cnt =  omp_get_max_threads();
+  int thd_cnt = 10;
+
   for(int i =0;i< thd_cnt;i++)
     cal_objs.emplace_back(new Calibration(set,startevent,RunNumber));
 
@@ -296,31 +301,23 @@ int main(int argc, char* argv[]){
     
   //Create vector containing TTrees. We make a TTree for each thread.
   for(int i =0;i< thd_cnt;i++){
-    //hists[i] = new TH1D(Form("Hist%d",i),"Histogram",1000,0,1000);
-    ctr_objs.emplace_back(new TTree(Form("ctr%d",i),"Gretina/S800 calibrated and builtevents"));
-    S800Calc* s800Calc = S800Calc_objs.at(i);
-    GretinaCalc* gretinaCalc = gretinaCalc_objs.at(i);
-    GretinaEvent* gretinaEvent = gretinaEvent_objs.at(i);
-    Mode3Calc* mode3Calc = mode3Calc_objs.at(i);
-
-    //Set different memory addresses for each branch in each different TTree
-    ctr_objs.at(i)->Branch("s800calc",&s800Calc, 320000);
-    ctr_objs.at(i)->Branch("gretinacalc",&gretinaCalc, 320000);
+    TTree *ctr = new TTree("ctr","Gretina/S800 calibrated and builtevents");
+    ctr->Branch("s800calc",S800Calc_objs.at(i), 320000);
+    ctr->Branch("gretinacalc",gretinaCalc_objs.at(i), 320000);
     if(trackMe)
-      ctr_objs.at(i)->Branch("gretinaevent",&gretinaEvent, 320000);
-    ctr_objs.at(i)->Branch("mode3calc",&mode3Calc, 320000);
-    ctr_objs.at(i)->BranchRef();
+      ctr->Branch("gretinaevent",gretinaEvent_objs.at(i), 320000);
+    ctr->Branch("mode3calc",mode3Calc_objs.at(i), 320000);
+    ctr->BranchRef();
+
+    ctr_objs.emplace_back(ctr);
   }
   
-
-
 
   vector<TCutG*> InPartCut;
   vector<vector<TCutG*> > OutPartCut;
   //vector<vector<TTree*> > splittree;
   vector<vector<vector<TTree*> > > splittree;
   
-
 
   if(CutFile!=NULL){
     cout << "Cuts were created for ";
@@ -343,11 +340,11 @@ int main(int argc, char* argv[]){
     TKey *key;
     while((key=(TKey*)next())){
       if(strcmp(key->GetClassName(),"TCutG") == 0){
-	Name = (char*)key->GetName();
-	if(strstr(Name,"in") && !strstr(Name,"out")){
-	  cout << "incoming cut found "<<Name << endl;
-	  InPartCut.push_back((TCutG*)cFile->Get(Name));
-	}
+  Name = (char*)key->GetName();
+  if(strstr(Name,"in") && !strstr(Name,"out")){
+    cout << "incoming cut found "<<Name << endl;
+    InPartCut.push_back((TCutG*)cFile->Get(Name));
+  }
       }      
     }
     TIter next2(cFile->GetListOfKeys());
@@ -355,16 +352,16 @@ int main(int argc, char* argv[]){
     
     while((key=(TKey*)next2())){
       if(strcmp(key->GetClassName(),"TCutG") == 0){
-	Name = (char*)key->GetName();
-	if(strstr(Name,"in") && strstr(Name,"out")){
-	  for(unsigned short i=0;i<InPartCut.size();i++){
-	    Name2 = (char*)InPartCut[i]->GetName();
-	    if(strstr(Name,strstr(Name2,Name2))){
-	      OutPartCut[i].push_back((TCutG*)cFile->Get(Name));
-	      cout << "outgoing cut found "<<Name << endl;
-	    }
-	  }
-	}
+  Name = (char*)key->GetName();
+  if(strstr(Name,"in") && strstr(Name,"out")){
+    for(unsigned short i=0;i<InPartCut.size();i++){
+      Name2 = (char*)InPartCut[i]->GetName();
+      if(strstr(Name,strstr(Name2,Name2))){
+        OutPartCut[i].push_back((TCutG*)cFile->Get(Name));
+        cout << "outgoing cut found "<<Name << endl;
+      }
+    }
+  }
       }
     }
     cFile->Close();
@@ -388,13 +385,13 @@ int main(int argc, char* argv[]){
       for(UShort_t in=0;in<InPartCut.size();in++){ // loop over incoming cuts
         splittree_i[in].resize(OutPartCut[in].size());
         for(UShort_t ou=0;ou<OutPartCut[in].size();ou++){ // loop over PID cuts
-        	splittree_i[in][ou] = new TTree(Form("ctr_%s",OutPartCut[in][ou]->GetName()),"Gretina/S800 calibrated and builtevents");
-        	splittree_i[in][ou]->Branch("s800calc",&s800Calc, 320000);
-        	splittree_i[in][ou]->Branch("gretinacalc",&gretinaCalc, 320000);
-        	if(trackMe)
-        	  splittree_i[in][ou]->Branch("gretinaevent",&gretinaEvent, 320000);
-        	splittree_i[in][ou]->Branch("mode3calc",&mode3Calc, 320000);
-  	      splittree_i[in][ou]->BranchRef();
+          splittree_i[in][ou] = new TTree(Form("ctr_%s",OutPartCut[in][ou]->GetName()),"Gretina/S800 calibrated and builtevents");
+          splittree_i[in][ou]->Branch("s800calc",&s800Calc, 320000);
+          splittree_i[in][ou]->Branch("gretinacalc",&gretinaCalc, 320000);
+          if(trackMe)
+            splittree_i[in][ou]->Branch("gretinaevent",&gretinaEvent, 320000);
+          splittree_i[in][ou]->Branch("mode3calc",&mode3Calc, 320000);
+          splittree_i[in][ou]->BranchRef();
         }
       }
     }
@@ -450,15 +447,16 @@ int main(int argc, char* argv[]){
 */
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-// This is a for loop that goes over all the enties. THIS WOULD NEED TO BE PARALLELIZED
+// This is a for loop that goes over all the entries. THIS WOULD NEED TO BE PARALLELIZED
 
-  int max_threads = omp_get_max_threads();
-  printf("MAX NUMBER OF THREADS: %d\n",max_threads);
+  //int max_threads = omp_get_max_threads();
+  printf("MAX NUMBER OF THREADS: %d\n",thd_cnt);
 
   int nent = (int)gtr->GetEntries();
+  int itr_per_thread =  nent/thd_cnt + (nent % thd_cnt >0);
   //#pragma omp parallel for ordered num_threads(max_threads) shared(ctr_objs,S800Calc_objs,gretinaCalc_objs,gretinaEvent_objs,mode3Calc_objs,s800_objs,gretina_objs,m3e_objs) reduction(+:nbytes)
   //#pragma omp parallel for num_threads(max_threads) shared(ctr_objs,S800Calc_objs,gretinaCalc_objs,gretinaEvent_objs,mode3Calc_objs) reduction(+:nbytes)
-  #pragma omp parallel for num_threads(max_threads) firstprivate(s800,gretina,m3e) shared(ctr_objs,S800Calc_objs,gretinaCalc_objs,gretinaEvent_objs,mode3Calc_objs) reduction(+:nbytes)
+  #pragma omp parallel for num_threads(thd_cnt) firstprivate(s800,gretina,m3e) shared(ctr_objs,S800Calc_objs,gretinaCalc_objs,gretinaEvent_objs,mode3Calc_objs,cal_objs) reduction(+:nbytes)
   for(int i=0; i<nent; i++){
     int status = 0;
     nentries = nent;
@@ -482,8 +480,8 @@ int main(int argc, char* argv[]){
       cout<<"On entry: "<<i<<endl;
       //cal->PrintCtrs();
       double time_end = get_time();
-      cout << setw(5) << setiosflags(ios::fixed) << setprecision(1) << (100.*i)/nentries<<" % done\t" << 
-      (Float_t)i/(time_end - time_start) << " events/s " << (nentries-i)*(time_end - time_start)/(Float_t)i << "s to go \r" << flush;
+      cout << setw(5) << setiosflags(ios::fixed) << setprecision(3) << (100.*i)/itr_per_thread<<" % done\t" << 
+      (Float_t)i/(time_end - time_start) << " events/s " << (itr_per_thread-i)*(time_end - time_start)/(Float_t)i << "s to go \r" << flush;
     }
 
     /*
@@ -494,42 +492,6 @@ int main(int argc, char* argv[]){
       ctr_objs.at(ID)->AutoSave();
     }
     */
-
-
-    /*
-    #pragma omp ordered 
-    {
-    printf("PAST THE IF STATEMENT FOR THREAD %d\n",ID);
-    }
-  */
-
-
-    /*
-    //It clears all of the data entries in that object
-    s800Calc->Clear();
-    gretinaCalc->Clear();
-    gretinaEvent->Clear();
-    mode3Calc->Clear();
-    s800->Clear();
-    gretina->Clear();
-    m3e->Clear();
-    */
-    /*
-    try{
-    S800Calc_objs.at(ID)->Clear();
-    gretinaCalc_objs.at(ID)->Clear();
-    gretinaEvent_objs.at(ID)->Clear();
-    mode3Calc_objs.at(ID)->Clear();
-    s800_objs.at(ID)->Clear();
-    gretina_objs.at(ID)->Clear();
-    m3e_objs.at(ID)->Clear();
-    }
-
-    catch (exception& e){
-      cerr<<"CAUGHT: "<<e.what()<<endl;
-    }
-    */
-
 
     //For the entry "i", grab the event that occured from the TTree gtr (input tree)
     /*
@@ -542,24 +504,14 @@ int main(int argc, char* argv[]){
     gretinaCalc_objs.at(ID)->Clear();
     gretinaEvent_objs.at(ID)->Clear();
     mode3Calc_objs.at(ID)->Clear();
-    //#pragma omp critical
-    //double start = omp_get_wtime();
     #pragma omp critical
     { 
 
       //printf("ENTERING CRITICAL. THREAD ID %d\n",ID);
-      /*
-      printf("BEFORE STATUS FOR THREAD %d is %d for i = %d \n", ID, status,i);
-      status = gtr->GetEvent(i);
-      printf("AFTER STATUS FOR THREAD %d is %d  for i = %d \n", ID,status,i);
-      */
-     // #pragma omp critical
-      //{
       s800->Clear();
       gretina->Clear();
       m3e->Clear();
-      //}
-        /*
+      /*
       printf("BEFORE STATUS FOR THREAD %d is %d for i = %d \n", ID, status,i);
       //status = gtr->GetEvent(i);
       //gtr_objs.at(ID)->GetEvent(i);
@@ -570,10 +522,12 @@ int main(int argc, char* argv[]){
         for(int j =0;j<cp->GetEntries();++j)
           cout<<cp->At(j)->GetName()<<endl;
       }
-  */  
-      gtr->GetEntry(i);
-      //status = gtr->GetEvent(i);
+      */  
+
+      //printf("BEFORE STATUS FOR THREAD %d is %d for i = %d \n", ID, status,i);
+      status=gtr->GetEntry(i,1);
       //printf("AFTER STATUS FOR THREAD %d is %d  for i = %d \n", ID,status,i);
+      //status = gtr->GetEvent(i);
       
 
       // printf("BUILDING OBJECTS\n");
@@ -583,13 +537,8 @@ int main(int argc, char* argv[]){
 
       //printf("LEAVING CRITICAL. THREAD ID %d\n",ID);
 
-    }
-    //double end = omp_get_wtime();
-    //double _time = end-start;
-    //printf("CRITICAL SECTION TOOK: %f s.\n",_time);
-
     // This is invalid exit for OMP. Will have to figure this out if I want to include this.
-    
+    /*
     if(status == -1){
       //cerr<<"Error occured, couldn't read entry "<<i<<" from tree "<<gtr->GetName()<<" in file "<<infile->GetName()<<endl;
       continue;
@@ -600,28 +549,18 @@ int main(int argc, char* argv[]){
       continue;
       //return 6;
     }
+    */
 
+    if(CutFile == NULL && status != -1 && status != 0)
+      ctr_objs.at(ID)->Fill();
+
+  }
     
 
     //There will be a data race with this variable
-    printf("WRITING TO NBYTES\n");
+    //printf("WRITING TO NBYTES\n");
     nbytes += status;
 
-
-
-    //Build all of the calibrated objects, using the calibration in cal.
-    //Use the data from the first three parameters, output into the last three parameters.
-
-    /*
-    cal->BuildAllCalc(s800,gretina,m3e,
-      s800Calc,gretinaCalc,mode3Calc);
-    */
-/*
-    printf("BUILDING OBJECTS\n");
-    cal_objs.at(ID)->BuildAllCalc(s800_objs.at(ID),gretina_objs.at(ID),m3e_objs.at(ID),
-      S800Calc_objs.at(ID),gretinaCalc_objs.at(ID),mode3Calc_objs.at(ID));
-    printf("DONE BUILDING OBJECTS\n");
-*/
 
     if(trackMe){
       // cal->GammaTrack(gretinaCalc,gretinaEvent)
@@ -638,11 +577,19 @@ int main(int argc, char* argv[]){
     merge all of the TTrees together. 
 
     */
+    /*
     if(CutFile==NULL){
       //ctr->Fill();
+      #pragma omp critical 
+      {
       printf("ATTEMPTING TO FILL CTR TREE\n");
+      ofile->cd();
       ctr_objs.at(ID)->Fill();
+      }
     }
+    */
+
+
     /*
     //Serial version
     else{
@@ -661,7 +608,7 @@ int main(int argc, char* argv[]){
           if(tac == 2 && !OutPartCut[in][ou]->IsInside(s800Calc->GetTOF()->GetTACXFPC(),s800Calc->GetIC()->GetDE()))
             continue;
           splittree[in][ou]->Fill();
-          }	
+          } 
         }
     }//split tree
     */
@@ -704,7 +651,7 @@ int main(int argc, char* argv[]){
   /*
   info->SetCounters(cal->GetICHCtr(),cal->GetHodoCtr(),cal->GetCARD29Ctr(),cal->GetGRETACtr(),cal->GetSCINTCtr());
   info->SetEff(cal->GetICHCtr(),cal->GetOBJCtr(),cal->GetXFPCtr(),cal->GetTOFCtr(),cal->GetPADCtr(),
-	cal->GetTRACKCtr(),cal->GetPPACCtr(),cal->GetIITRACKCtr(),cal->GetCARD29Ctr(),cal->GetSCINTCtr());
+  cal->GetTRACKCtr(),cal->GetPPACCtr(),cal->GetIITRACKCtr(),cal->GetCARD29Ctr(),cal->GetSCINTCtr());
   cout << endl;
   */
   
