@@ -43,6 +43,7 @@
 #include <omp.h>
 #include<thread>
 #include<mutex>
+#include<chrono>
 
 #include "TFile.h"
 #include "TChain.h"
@@ -71,16 +72,17 @@ using namespace std;
 
 //Create our shared lock
 mutex mtx;
-S800Calc* s800Calc; 
-GretinaCalc* gretinaCalc; 
-GretinaEvent* gretinaEvent; 
-Mode3Calc* mode3Calc;
+S800Calc* s800Calc = NULL; 
+GretinaCalc* gretinaCalc=NULL; 
+GretinaEvent* gretinaEvent=NULL; 
+Mode3Calc* mode3Calc=NULL;
 double time_start=0;
 char* CutFile = NULL;
 vector<TCutG*> InPartCut;
 vector<vector<TCutG*> > OutPartCut;
 vector<vector<TTree*>> splittree;
 int tac =0;
+TFile *ofile=NULL;
 
 
 bool signal_received = false;
@@ -118,7 +120,7 @@ void clearing(Mode3Event *m3e, S800 *s800, Gretina *gretina){
 
 void fill_tree(TTree *ctr, S800Calc *s800Calc, GretinaCalc *gretinaCalc, 
 GretinaEvent *gretinaEvent, Mode3Calc *mode3Calc,
-TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina, 
+TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina, Calibration *cal,
  int n_itr_per_thrd, int ID, Int_t &nbytes){
 
   //printf("INSIDE THREAD FUNCTION, THD %d\n", ID);
@@ -148,9 +150,10 @@ TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina,
 
     if(id_0){
       //printf("INSIDE THE FIRST IF STATEMENT\n");
-      cout<<"On entry: "<<i<<endl;
+      printf("ON ENTRY %d\n",i);
+      //cout<<"On entry: "<<i<<endl;
       double time_end = get_time();
-      cout << setw(5) << setiosflags(ios::fixed) << setprecision(1) << (100.*i)/n_itr_per_thrd<<" % done\t" << 
+      cout << setw(5) << setiosflags(ios::fixed) << setprecision(3) << (100.*i)/n_itr_per_thrd<<" % done\t" << 
       (Float_t)i/(time_end - time_start) << " events/s " << (n_itr_per_thrd-i)*(time_end - time_start)/(Float_t)i << "s to go \r" << flush;
       cout<<endl;
       
@@ -162,16 +165,18 @@ TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina,
       */
     }
 
-      
+      /*
     if(i%1000000 == 0 && CutFile==NULL){
       mtx.lock();
       //printf("ATTEMPTING TO AUTOSAVE. THREAD: %d with run %d\n",ID,i);
       //ctr.AutoSave();
+      ofile->cd();
       ctr->AutoSave();
       mtx.unlock();
       //ofile->cd();
       //ctr_objs.at(ID)->AutoSave();
     }
+    */
     
 
     /*
@@ -187,13 +192,13 @@ TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina,
     //gretinaEvent.Clear();
     //mode3Calc.Clear();
       
-    //mtx.lock();
+    mtx.lock();
     //printf("CLEARING THE CALC\n");
     s800Calc->Clear();
     gretinaCalc->Clear();
     gretinaEvent->Clear();
     mode3Calc->Clear();
-    //mtx.unlock();
+    mtx.unlock();
 
 
 
@@ -202,9 +207,24 @@ TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina,
     s800->Clear();
     gretina->Clear();
     m3e->Clear(); 
-    status = gtr->GetEntry(i,1);
     mtx.unlock();
-    
+
+    mtx.lock();
+    //printf("THREAD %d IS GETTING STATUS\n",ID);
+    status = gtr->GetEvent(i);
+    //status = gtr->GetEntry(i,1);
+    //printf("ATTEMPTING TO BUILD, THREAD %d\n",ID);
+    cal->BuildAllCalc(s800,gretina,m3e,
+      s800Calc,gretinaCalc,mode3Calc);
+    //printf("THREAD %d HAS BUILT CAL\n",ID);
+
+    if(CutFile==NULL && status != -1 && status != 0){
+      this_thread::sleep_for(chrono::microseconds(800));
+      ofile->cd();
+      ctr->Fill();
+    }
+    mtx.unlock();
+
 
     //This section requires a shared lock
     //clearing(m3e,s800,gretina);
@@ -227,7 +247,7 @@ TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina,
     //printf("THE STATUS IS: %d\n", status);
     //status = (int)gtr.GetEntry(i);
     //mtx.unlock();
-
+    
     if(status == -1){
       //cerr<<"Error occured, couldn't read entry "<<i<<" from tree "<<gtr->GetName()<<" in file "<<infile->GetName()<<endl;
       continue;
@@ -238,7 +258,8 @@ TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina,
       continue;
       //return 6;
     }
-
+    
+  
     nbytes += status;
 
     /*
@@ -247,18 +268,27 @@ TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina,
     }
     */
 
-    if(CutFile==NULL){
+/*    
+    if(CutFile==NULL && status !=-1 && status !=0){
       //ctr.Fill();
-      //mtx.lock();
-      //printf("CUTFILE IS NULL\n");
+      // I belive this is in a lock due to writing to the same output file
+      mtx.lock();
+      //printf("CUTFILE IS NULL, THREAD %d, ENTRY %d, STATUS %d\n", ID,i,status);
+      //this_thread::sleep_for(chrono::milliseconds(1));
+      this_thread::sleep_for(chrono::microseconds(800));
+      ofile->cd();
       ctr->Fill();
-      //mtx.unlock();
+      mtx.unlock();
     }
-
+    */
     
+    
+
+    /*
+    The cutfile is always NULL
     else{
       cout<<"IN THE ELSE FOR CUTFILE\n";
-      /*
+      
       mtx.lock();
       printf("IN THE ELSE STATEMENT\n");
       for(UShort_t in=0;in<InPartCut.size();in++){ // loop over incoming cuts
@@ -279,9 +309,9 @@ TTree *gtr, Mode3Event *m3e, S800 *s800, Gretina *gretina,
           } 
         }
       mtx.unlock();
-      */
+      
     }//split tree
-  
+  */
 
 
   }
@@ -333,7 +363,8 @@ int main(int argc, char* argv[]){
   }
 
   cout<<"OPENING OUTPUT FILE\n";
-  TFile *ofile = new TFile(RootFile,"RECREATE");
+  ofile = new TFile(RootFile,"RECREATE");
+  //TFile *ofile = new TFile(RootFile,"RECREATE");
   cout<<"OPENED OUTPUT FILE\n";
 
 
@@ -349,7 +380,7 @@ int main(int argc, char* argv[]){
   int nentries = (int)gtr->GetEntries();
   //int max_threads = omp_get_max_threads();
 
-  int max_threads = 32;
+  int max_threads = 10;
   //int itr_per_thread =  nentries/max_threads + (nentries % max_threads >0);
   int itr_per_thread =  nentries/max_threads + (nentries % max_threads >0);
   printf("ITERATION PER THREAD %d",itr_per_thread);
@@ -406,9 +437,30 @@ int main(int argc, char* argv[]){
   cout << "run number " << RunNumber << " starts with event nr " << startevent << endl;   
 
   
+  //The serial version  
   Calibration *cal = new Calibration(set,startevent,RunNumber); //AR New in v4.1_TL
   cout << "Brho " << cal->GetBrho() << " mass " <<  cal->GetMass() << " Z " << cal->GetZ() << endl;
   info->SetBeam(cal->GetBrho(), cal->GetMass(), cal->GetZ());
+  
+
+  /*
+
+    // The parallel Version
+  vector<Calibration*> cal_objs;
+  int thd_cnt =  omp_get_max_threads();
+
+  for(int i =0;i< thd_cnt;i++){
+    Calibration *cal = new Calibration(set,startevent,RunNumber);
+    cal_objs.emplace_back(cal);
+    //cal_objs.emplace_back(new Calibration(set,startevent,RunNumber));
+  }
+
+  cout << "Brho " << cal_objs.at(0)->GetBrho() << " mass " <<  cal_objs.at(0)->GetMass() << " Z " << cal_objs.at(0)->GetZ() << endl;
+  info->SetBeam(cal_objs.at(0)->GetBrho(), cal_objs.at(0)->GetMass(), cal_objs.at(0)->GetZ());
+
+*/
+
+
 
   /*
   // The serial version
@@ -430,6 +482,7 @@ int main(int argc, char* argv[]){
   //vector<vector<TTree*>> splittree;
   vector<vector<vector<TTree*> > > splittree_vec;
 
+  ofile->cd();
   // ============= CREATING THE TTREE FOR EACH THREAD ============= //
   std::vector<TTree*> ctr_objs;
   std::vector<S800Calc*> S800Calc_objs;
@@ -437,6 +490,7 @@ int main(int argc, char* argv[]){
   std::vector<GretinaEvent*> gretinaEvent_objs;
   std::vector<Mode3Calc*> mode3Calc_objs;
 
+  
   //Generatate all the data objects that are going to be branches in each TTree
     for(int i=0;i<max_threads;i++){
       S800Calc_objs.emplace_back(new S800Calc);
@@ -444,6 +498,7 @@ int main(int argc, char* argv[]){
       gretinaEvent_objs.emplace_back(new GretinaEvent);
       mode3Calc_objs.emplace_back(new Mode3Calc);
     }
+    
         
     // Create vector containing TTrees. We make a TTree for each thread with their 
     // own branches.
@@ -656,6 +711,8 @@ int main(int argc, char* argv[]){
       GretinaEvent *gretinaEvent = gretinaEvent_objs[i];
       Mode3Calc *mode3Calc = mode3Calc_objs[i];
       Int_t nbytes = (Int_t)nbytes_vec[i];
+      printf("GETTING CAL\n");
+      //Calibration *cal = cal_objs[i];
       
       //vector<vector<TTree*>> st;
       //if(CutFile == NULL)
@@ -691,7 +748,7 @@ int main(int argc, char* argv[]){
 
         thds.emplace_back(fill_tree,ctr, s800Calc,gretinaCalc,
         gretinaEvent, mode3Calc,
-        gtr,m3e,s800,gretina,
+        gtr,m3e,s800,gretina, cal,
         itr_per_thread,i, std::ref(nbytes));
 
   }
