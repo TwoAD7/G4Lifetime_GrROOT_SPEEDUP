@@ -283,7 +283,8 @@ int main(int argc, char* argv[]){
     if(i%10000 == 0){
       //cal->PrintCtrs();
       double time_end = get_time();
-      cout << setw(5) << setiosflags(ios::fixed) << setprecision(1) << (100.*i)/nentries<<" % done\t" << 
+      printf("Currently on entry %d\n",i);
+      cout << setw(5) << setiosflags(ios::fixed) << setprecision(3) << (100.*i)/nentries<<" % done\t" << 
       (Float_t)i/(time_end - time_start) << " events/s " << (nentries-i)*(time_end - time_start)/(Float_t)i << "s to go \r" << flush;
     }
     if(i%1000000 == 0 && CutFile==NULL)

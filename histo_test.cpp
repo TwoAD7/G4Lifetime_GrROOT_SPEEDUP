@@ -45,7 +45,7 @@ TH1D *merge_histograms(TString name){
 void fill_hist(std::vector<TH1D*> &hists, int thd_id){
 	TRandom *rng = new TRandom();
 	double myRand;
-	for (int j = 0; j < 10000000; j++) {
+	for (int j = 0; j < 100000000; j++) {
 		myRand = rng->Gaus(350+thd_id*8,20+2*thd_id);
 		hists.at(thd_id)->Fill(myRand);
 	}
@@ -56,7 +56,7 @@ int main(int argc,char **argv){
 
 	TH1D* hist_serial = new TH1D("hist_serial","Histogram",1000,0,1000);
 
-	//Uncomment if using the omp method
+	//Uncomment if using the omp method or serial method
 	//TRandom *rng = new TRandom();
 	//double myRand;
 
@@ -79,6 +79,8 @@ int main(int argc,char **argv){
 
 	double t1 = omp_get_wtime();
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	//c++ threads version 
 	
 	//TH1D* hist_test = new TH1D("hist_test","Histogram",1000,800,600);
 	std::vector<std::thread> thrds;
@@ -93,8 +95,11 @@ int main(int argc,char **argv){
 			t.join();
 	}
 	
-
-	/*
+	double t2 = omp_get_wtime();
+	std::cout << "Elapsed: " << t2-t1 << std::endl;
+	
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+/*
 	//int i,j;
 	//# pragma omp parallel for num_threads(nhist) shared(hists) shared(hists) schedule(guided) collapse(2)
 	//for (int i = 0; i < nhist; i++) { schedule(dynamic,500) shared(hists) collapse(2) reduction(+:hist[:1000])
@@ -105,7 +110,7 @@ int main(int argc,char **argv){
 	# pragma omp parallel for num_threads(nhist) shared(hists) schedule(dynamic,1000)
 	for(int i=0; i<nhist;i++){
 		//printf("On thread %d with loop iteration %d\n",omp_get_thread_num(),i);
-	for (int j = 0; j < 10000000; j++) {
+	for (int j = 0; j < 100000000; j++) {
 		//printf("Thread ID: %d\n",i);
 		//int i = omp_get_thread_num();
 			 //myRand = rng->Gaus(i,i);
@@ -124,43 +129,36 @@ int main(int argc,char **argv){
 			 //std::cout<<bin<<std::endl;
 	}
 }
-	
+
 	//TH1D *total = new TH1D("total","Total",1000,0.0,1000.);
 	//total->FillN(1000,hist,1);
-	*/
-	
-
-
 
 	double t2 = omp_get_wtime();
 	std::cout << "Elapsed: " << t2-t1 << std::endl;
+*/
+	
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-	
-
-
-	f->Write();
-	f->Close();
-	
-	
-	
 	/*
 	// Serial version of filling a histogram
 	for (int i = 0; i < nhist; i++) {
-		for (int j = 0; j < 10000000; j++) {
+		for (int j = 0; j < 100000000; j++) {
 			 //myRand = rng->Gaus(i,i);
 			 myRand = rng->Gaus(350+i*8,20+2*i);
 			 hist_serial->Fill(myRand);
 		}
 	}
 	
-	
-	
 	double t2 = omp_get_wtime();
 	std::cout << "Elapsed: " << t2-t1 << std::endl;
-	
 	*/
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	f->Write();
+	f->Close();
 
 	
+	// To be used with the c++ threads /OMPversion		
 	TH1D *total = merge_histograms(ofname);
 	
 	//TH1D *total = merge_histograms(hists);
@@ -181,6 +179,7 @@ int main(int argc,char **argv){
 	app.Run();
 	
 	
+	
 
 	
 	/*
@@ -192,8 +191,9 @@ int main(int argc,char **argv){
 	TRootCanvas *rc = (TRootCanvas *)c->GetCanvasImp();
 	rc->Connect("CloseWindow()", "TApplication", gApplication, "Terminate()");
 	app.Run();
-   
 	*/
+   
+	
 
 	return 0;
 
